@@ -13,6 +13,7 @@ final _imagePicker = ImagePicker();
 typedef WidgetBuilder = Widget Function(
   BuildContext context,
   String? url,
+  bool isFromNetwork,
   VoidCallback? onPressed,
 );
 
@@ -116,6 +117,14 @@ class EasyImageState extends State<EasyImage> {
     }
   }
 
+  bool get isFromNetwork {
+    if (kIsWeb) {
+      return true;
+    } else {
+      return localUrl == null;
+    }
+  }
+
   String? get _url {
     return localUrl ?? _initialUrl;
   }
@@ -128,7 +137,7 @@ class EasyImageState extends State<EasyImage> {
 
   @override
   Widget build(BuildContext context) =>
-      widget.builder(context, _url, showPicker);
+      widget.builder(context, _url, isFromNetwork, showPicker);
 
   void showPicker() {
     final removeAction = widget.removeAction;
