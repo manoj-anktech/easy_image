@@ -117,11 +117,7 @@ class EasyImageState extends State<EasyImage> {
   }
 
   String? get _url {
-    if (kIsWeb) {
-      return _file?.path ?? _initialUrl;
-    } else {
-      return _croppedFile?.path ?? _file?.path ?? _initialUrl;
-    }
+    return localUrl ?? _initialUrl;
   }
 
   @override
