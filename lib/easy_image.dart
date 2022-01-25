@@ -10,6 +10,12 @@ import 'package:image_picker/image_picker.dart';
 
 final _imagePicker = ImagePicker();
 
+typedef WidgetBuilder = Widget Function(
+  BuildContext context,
+  String? url,
+  VoidCallback? onPressed,
+);
+
 typedef PermissionErrorCallback = void Function(bool isCamera);
 
 typedef ErrorCallback = void Function(dynamic exception, StackTrace? stack);
@@ -63,14 +69,16 @@ class EasyImageRemoveAction extends EasyImageListTile {
 
 class EasyImage extends StatefulWidget {
   const EasyImage({
-    Key? key,
     required this.builder,
     required this.camera,
     required this.gallery,
     required this.onPermissionError,
+    this.initialUrl,
     this.removeAction,
     this.cropSettings,
     this.onError,
+    this.onChanged,
+    Key? key,
   }) : super(key: key);
 
   final WidgetBuilder builder;
@@ -81,21 +89,52 @@ class EasyImage extends StatefulWidget {
 
   final PermissionErrorCallback onPermissionError;
 
+  final String? initialUrl;
+
   final EasyImageRemoveAction? removeAction;
 
   final CropSettings? cropSettings;
 
   final ErrorCallback? onError;
 
+  final ValueChanged<String?>? onChanged;
+
   @override
   EasyImageState createState() => EasyImageState();
 }
 
 class EasyImageState extends State<EasyImage> {
-  @override
-  Widget build(BuildContext context) => widget.builder(context);
+  String? _initialUrl;
+  File? _croppedFile;
+  XFile? _file;
 
-  void showImagePicker() {
+  String? get localUrl {
+    if (kIsWeb) {
+      return _file?.path;
+    } else {
+      return _croppedFile?.path ?? _file?.path;
+    }
+  }
+
+  String? get _url {
+    if (kIsWeb) {
+      return _file?.path ?? _initialUrl;
+    } else {
+      return _croppedFile?.path ?? _file?.path ?? _initialUrl;
+    }
+  }
+
+  @override
+  void initState() {
+    _initialUrl = widget.initialUrl;
+    super.initState();
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      widget.builder(context, _url, showPicker);
+
+  void showPicker() {
     final removeAction = widget.removeAction;
 
     showModalBottomSheet(
@@ -141,10 +180,6 @@ class EasyImageState extends State<EasyImage> {
         });
   }
 
-  File? _croppedFile;
-
-  XFile? _file;
-
   void _getImage(ImageSource source) async {
     final cropSettings = widget.cropSettings;
 
@@ -187,20 +222,20 @@ class EasyImageState extends State<EasyImage> {
   }
 
   _setFiles(XFile file, File? croppedFile) {
-    _file = _file;
-    _croppedFile = croppedFile;
+    setState(() {
+      _initialUrl = null;
+      _file = _file;
+      _croppedFile = croppedFile;
+      widget.onChanged?.call(localUrl);
+    });
   }
 
   _removeImage() {
-    _croppedFile = null;
-    _file = null;
-  }
-
-  String? get localImagePath {
-    if (kIsWeb) {
-      return _file?.path;
-    } else {
-      return _croppedFile?.path ?? _file?.path;
-    }
+    setState(() {
+      _initialUrl = null;
+      _file = null;
+      _croppedFile = null;
+      widget.onChanged?.call(localUrl);
+    });
   }
 }
