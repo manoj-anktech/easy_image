@@ -229,7 +229,7 @@ class EasyImageState extends State<EasyImage> {
   _setFiles(XFile file, File? croppedFile) {
     setState(() {
       _initialUrl = null;
-      _file = _file;
+      _file = file;
       _croppedFile = croppedFile;
       widget.onChanged?.call(localUrl);
     });
