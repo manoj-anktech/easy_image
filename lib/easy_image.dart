@@ -1,7 +1,5 @@
 library easy_image;
 
-import 'dart:io';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -106,15 +104,11 @@ class EasyImage extends StatefulWidget {
 
 class EasyImageState extends State<EasyImage> {
   String? _initialUrl;
-  File? _croppedFile;
-  XFile? _file;
+
+  ImagePickerResult? _imagePickerResult;
 
   String? get localUrl {
-    if (kIsWeb) {
-      return _file?.path;
-    } else {
-      return _croppedFile?.path ?? _file?.path;
-    }
+    return _imagePickerResult?.url;
   }
 
   bool get isFromNetwork {
@@ -146,40 +140,38 @@ class EasyImageState extends State<EasyImage> {
         context: context,
         builder: (BuildContext bc) {
           return SafeArea(
-            child: Container(
-              child: Wrap(
-                children: <Widget>[
-                  ListTile(
-                      leading: widget.camera.leading,
-                      title: widget.camera.title,
-                      onTap: () {
-                        _getImage(ImageSource.camera);
-                        Navigator.of(context).pop();
-                      }),
-                  ListTile(
-                    leading: widget.gallery.leading,
-                    title: widget.gallery.title,
+            child: Wrap(
+              children: <Widget>[
+                ListTile(
+                    leading: widget.camera.leading,
+                    title: widget.camera.title,
                     onTap: () {
-                      _getImage(
-                        ImageSource.gallery,
-                      );
+                      _getImage(ImageSource.camera);
                       Navigator.of(context).pop();
+                    }),
+                ListTile(
+                  leading: widget.gallery.leading,
+                  title: widget.gallery.title,
+                  onTap: () {
+                    _getImage(
+                      ImageSource.gallery,
+                    );
+                    Navigator.of(context).pop();
+                  },
+                ),
+                if (removeAction != null)
+                  ListTile(
+                    leading: removeAction.leading,
+                    title: removeAction.title,
+                    onTap: () async {
+                      Navigator.of(context).pop();
+                      final result = await removeAction.onRemove();
+                      if (result) {
+                        _removeImage();
+                      }
                     },
                   ),
-                  if (removeAction != null)
-                    ListTile(
-                      leading: removeAction.leading,
-                      title: removeAction.title,
-                      onTap: () async {
-                        Navigator.of(context).pop();
-                        final result = await removeAction.onRemove();
-                        if (result) {
-                          _removeImage();
-                        }
-                      },
-                    ),
-                ],
-              ),
+              ],
             ),
           );
         });
@@ -188,49 +180,27 @@ class EasyImageState extends State<EasyImage> {
   void _getImage(ImageSource source) async {
     final cropSettings = widget.cropSettings;
 
-    try {
-      final file = await _imagePicker.pickImage(
-          source: source,
-          maxWidth: kIsWeb ? cropSettings?.maxWidth?.toDouble() : null,
-          maxHeight: kIsWeb ? cropSettings?.maxHeight?.toDouble() : null);
+    final result = await getImage(source: source, cropSettings: cropSettings);
 
-      if (file != null) {
-        if (kIsWeb) {
-          _setFiles(file, null);
-          return;
-        }
+    final error = result.error;
 
-        final croppedFile = await ImageCropper.cropImage(
-            sourcePath: file.path,
-            aspectRatio: cropSettings?.aspectRatio,
-            maxWidth: cropSettings?.maxWidth,
-            maxHeight: cropSettings?.maxHeight,
-            compressQuality: cropSettings?.compressQuality ?? 90,
-            compressFormat:
-                cropSettings?.compressFormat ?? ImageCompressFormat.jpg,
-            androidUiSettings: cropSettings?.androidUiSettings,
-            iosUiSettings: cropSettings?.iosUiSettings);
-
-        _setFiles(file, croppedFile);
-      }
-    } on PlatformException catch (exception, stack) {
-      if (exception.code == "camera_access_denied" ||
-          exception.code == "photo_access_denied") {
-        final isCamera = exception.code == "camera_access_denied";
+    if (error == null) {
+      _setImagePickerResult(result);
+    } else {
+      final code = error.code;
+      if (code == "camera_access_denied" || code == "photo_access_denied") {
+        final isCamera = code == "camera_access_denied";
         widget.onPermissionError.call(isCamera);
       } else {
-        widget.onError?.call(exception, stack);
+        widget.onError?.call(error, result.stackTrace);
       }
-    } catch (exception, stack) {
-      widget.onError?.call(exception, stack);
     }
   }
 
-  _setFiles(XFile file, File? croppedFile) {
+  _setImagePickerResult(ImagePickerResult result) {
     setState(() {
       _initialUrl = null;
-      _file = file;
-      _croppedFile = croppedFile;
+      _imagePickerResult = result;
       widget.onChanged?.call(localUrl);
     });
   }
@@ -238,9 +208,66 @@ class EasyImageState extends State<EasyImage> {
   _removeImage() {
     setState(() {
       _initialUrl = null;
-      _file = null;
-      _croppedFile = null;
+      _imagePickerResult = null;
       widget.onChanged?.call(localUrl);
     });
   }
+}
+
+@immutable
+class ImagePickerResult {
+  final String? camera;
+  final String? cropped;
+  final dynamic error;
+  final StackTrace? stackTrace;
+
+  const ImagePickerResult({
+    this.camera,
+    this.cropped,
+    this.error,
+    this.stackTrace,
+  });
+
+  String? get url {
+    if (kIsWeb) {
+      return camera;
+    } else {
+      return cropped ?? camera;
+    }
+  }
+}
+
+Future<ImagePickerResult> getImage({
+  required ImageSource source,
+  CropSettings? cropSettings,
+}) async {
+  try {
+    final file = await _imagePicker.pickImage(
+        source: source,
+        maxWidth: kIsWeb ? cropSettings?.maxWidth?.toDouble() : null,
+        maxHeight: kIsWeb ? cropSettings?.maxHeight?.toDouble() : null);
+
+    if (file != null) {
+      if (kIsWeb) {
+        return ImagePickerResult(camera: file.path);
+      }
+
+      final croppedFile = await ImageCropper.cropImage(
+          sourcePath: file.path,
+          aspectRatio: cropSettings?.aspectRatio,
+          maxWidth: cropSettings?.maxWidth,
+          maxHeight: cropSettings?.maxHeight,
+          compressQuality: cropSettings?.compressQuality ?? 90,
+          compressFormat:
+              cropSettings?.compressFormat ?? ImageCompressFormat.jpg,
+          androidUiSettings: cropSettings?.androidUiSettings,
+          iosUiSettings: cropSettings?.iosUiSettings);
+
+      return ImagePickerResult(camera: file.path, cropped: croppedFile?.path);
+    }
+  } catch (exception, stackTrace) {
+    return ImagePickerResult(error: exception, stackTrace: stackTrace);
+  }
+
+  return ImagePickerResult(error: PlatformException(code: "unknown"));
 }
