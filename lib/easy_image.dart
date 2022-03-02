@@ -252,7 +252,7 @@ Future<ImagePickerResult> getImage({
         return ImagePickerResult(camera: file.path);
       }
 
-      final croppedFile = await ImageCropper.cropImage(
+      final croppedFile = await ImageCropper().cropImage(
           sourcePath: file.path,
           aspectRatio: cropSettings?.aspectRatio,
           maxWidth: cropSettings?.maxWidth,
