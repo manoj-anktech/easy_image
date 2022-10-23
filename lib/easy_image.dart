@@ -1,5 +1,6 @@
 library easy_image;
 
+import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -28,6 +29,7 @@ class CropSettings {
     this.aspectRatio,
     this.androidUiSettings,
     this.iosUiSettings,
+    this.webUiSettings,
     this.cropStyle = CropStyle.rectangle,
     this.compressFormat = ImageCompressFormat.jpg,
     this.compressQuality = 90,
@@ -38,6 +40,7 @@ class CropSettings {
   final CropAspectRatio? aspectRatio;
   final AndroidUiSettings? androidUiSettings;
   final IOSUiSettings? iosUiSettings;
+  final WebUiSettings? webUiSettings;
   final CropStyle cropStyle;
   final ImageCompressFormat compressFormat;
   final int compressQuality;
@@ -153,9 +156,7 @@ class EasyImageState extends State<EasyImage> {
                   leading: widget.gallery.leading,
                   title: widget.gallery.title,
                   onTap: () {
-                    _getImage(
-                      ImageSource.gallery,
-                    );
+                    _getImage(ImageSource.gallery);
                     Navigator.of(context).pop();
                   },
                 ),
@@ -177,10 +178,15 @@ class EasyImageState extends State<EasyImage> {
         });
   }
 
-  void _getImage(ImageSource source) async {
+  void _getImage(
+    ImageSource source,
+  ) async {
     final cropSettings = widget.cropSettings;
 
-    final result = await getImage(source: source, cropSettings: cropSettings);
+    final result = await getImage(
+      source: source,
+      cropSettings: cropSettings,
+    );
 
     final error = result.error;
 
@@ -229,11 +235,7 @@ class ImagePickerResult {
   });
 
   String? get url {
-    if (kIsWeb) {
-      return camera;
-    } else {
-      return cropped ?? camera;
-    }
+    return cropped ?? camera;
   }
 }
 
@@ -243,25 +245,25 @@ Future<ImagePickerResult> getImage({
 }) async {
   try {
     final file = await _imagePicker.pickImage(
-        source: source,
-        maxWidth: kIsWeb ? cropSettings?.maxWidth?.toDouble() : null,
-        maxHeight: kIsWeb ? cropSettings?.maxHeight?.toDouble() : null);
+      source: source,
+      maxWidth: cropSettings?.maxWidth?.toDouble(),
+      maxHeight: cropSettings?.maxHeight?.toDouble(),
+    );
 
     if (file != null) {
-      if (kIsWeb) {
-        return ImagePickerResult(camera: file.path);
-      }
-
       final croppedFile = await ImageCropper().cropImage(
-          sourcePath: file.path,
-          aspectRatio: cropSettings?.aspectRatio,
-          maxWidth: cropSettings?.maxWidth,
-          maxHeight: cropSettings?.maxHeight,
-          compressQuality: cropSettings?.compressQuality ?? 90,
-          compressFormat:
-              cropSettings?.compressFormat ?? ImageCompressFormat.jpg,
-          androidUiSettings: cropSettings?.androidUiSettings,
-          iosUiSettings: cropSettings?.iosUiSettings);
+        sourcePath: file.path,
+        aspectRatio: cropSettings?.aspectRatio,
+        maxWidth: cropSettings?.maxWidth,
+        maxHeight: cropSettings?.maxHeight,
+        compressQuality: cropSettings?.compressQuality ?? 90,
+        compressFormat: cropSettings?.compressFormat ?? ImageCompressFormat.jpg,
+        uiSettings: [
+          cropSettings?.androidUiSettings,
+          cropSettings?.iosUiSettings,
+          cropSettings?.webUiSettings,
+        ].whereNotNull().toList(),
+      );
 
       return ImagePickerResult(camera: file.path, cropped: croppedFile?.path);
     }
