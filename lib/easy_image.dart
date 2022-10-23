@@ -246,8 +246,6 @@ Future<ImagePickerResult> getImage({
   try {
     final file = await _imagePicker.pickImage(
       source: source,
-      maxWidth: cropSettings?.maxWidth?.toDouble(),
-      maxHeight: cropSettings?.maxHeight?.toDouble(),
     );
 
     if (file != null) {
