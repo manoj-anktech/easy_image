@@ -10,17 +10,19 @@ import 'package:image_picker/image_picker.dart';
 final _imagePicker = ImagePicker();
 
 typedef WidgetBuilder = Widget Function(
-  BuildContext context,
-  String? url,
-  bool isFromNetwork,
-  VoidCallback? onPressed,
-);
+    BuildContext context,
+    String? url,
+    bool isFromNetwork,
+    VoidCallback? onPressed,
+    );
 
 typedef PermissionErrorCallback = void Function(bool isCamera);
 
 typedef ErrorCallback = void Function(dynamic exception, StackTrace? stack);
 
 typedef RemoveCallback = Future<bool> Function();
+
+typedef LibraryCallback = Future<String?> Function();
 
 class CropSettings {
   const CropSettings({
@@ -62,11 +64,24 @@ class EasyImageRemoveAction extends EasyImageListTile {
     required Widget title,
     required this.onRemove,
   }) : super(
-          leading: leading,
-          title: title,
-        );
+    leading: leading,
+    title: title,
+  );
 
   final RemoveCallback onRemove;
+}
+
+class EasyImageLibraryAction extends EasyImageListTile {
+  const EasyImageLibraryAction({
+    required Widget leading,
+    required Widget title,
+    required this.onLibraryClick,
+  }) : super(
+    leading: leading,
+    title: title,
+  );
+
+  final LibraryCallback onLibraryClick;
 }
 
 class EasyImage extends StatefulWidget {
@@ -77,6 +92,7 @@ class EasyImage extends StatefulWidget {
     required this.onPermissionError,
     this.initialUrl,
     this.removeAction,
+    this.libraryAction,
     this.cropSettings,
     this.onError,
     this.onChanged,
@@ -94,6 +110,8 @@ class EasyImage extends StatefulWidget {
   final String? initialUrl;
 
   final EasyImageRemoveAction? removeAction;
+
+  final EasyImageLibraryAction? libraryAction;
 
   final CropSettings? cropSettings;
 
@@ -139,19 +157,33 @@ class EasyImageState extends State<EasyImage> {
   void showPicker() {
     final removeAction = widget.removeAction;
 
+    final libraryAction = widget.libraryAction;
+
     showModalBottomSheet(
         context: context,
         builder: (BuildContext bc) {
           return SafeArea(
             child: Wrap(
               children: <Widget>[
-                ListTile(
-                    leading: widget.camera.leading,
-                    title: widget.camera.title,
-                    onTap: () {
-                      _getImage(ImageSource.camera);
+                if (libraryAction != null)
+                  ListTile(
+                    leading: libraryAction.leading,
+                    title: libraryAction.title,
+                    onTap: () async {
                       Navigator.of(context).pop();
-                    }),
+                      final result = await libraryAction.onLibraryClick();
+                      if (result != null) {
+                        _setImagePickerResult(ImagePickerResult(camera: result, cropped: result),);
+                      }
+                    },
+                  ),
+                ListTile(
+                  leading: widget.camera.leading,
+                  title: widget.camera.title,
+                  onTap: () {
+                    _getImage(ImageSource.camera);
+                    Navigator.of(context).pop();
+                  },),
                 ListTile(
                   leading: widget.gallery.leading,
                   title: widget.gallery.title,
@@ -175,12 +207,12 @@ class EasyImageState extends State<EasyImage> {
               ],
             ),
           );
-        });
+        }
+
+    );
   }
 
-  void _getImage(
-    ImageSource source,
-  ) async {
+  void _getImage(ImageSource source,) async {
     final cropSettings = widget.cropSettings;
 
     final result = await getImage(
