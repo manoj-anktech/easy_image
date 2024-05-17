@@ -274,10 +274,12 @@ class ImagePickerResult {
 Future<ImagePickerResult> getImage({
   required ImageSource source,
   CropSettings? cropSettings,
+  CameraDevice preferredCameraDevice = CameraDevice.rear,
 }) async {
   try {
     final file = await _imagePicker.pickImage(
       source: source,
+      preferredCameraDevice: preferredCameraDevice,
     );
 
     if (file != null) {
